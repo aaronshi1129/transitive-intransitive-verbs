@@ -1,0 +1,704 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Transitive vs Intransitive Verbs</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f0f4f8;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+        .draggable {
+            cursor: grab;
+            user-select: none;
+        }
+        .draggable:active {
+            cursor: grabbing;
+        }
+        .droppable {
+            transition: all 0.2s ease;
+        }
+        .droppable.highlight {
+            background-color: #e0f2fe !important;
+            transform: scale(1.02);
+        }
+        .warning {
+            animation: shake 0.5s;
+        }
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            20%, 60% { transform: translateX(-5px); }
+            40%, 80% { transform: translateX(5px); }
+        }
+        .success-animation {
+            animation: success-pulse 0.5s;
+        }
+        @keyframes success-pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+            100% { transform: scale(1); }
+        }
+        .shuffle-animation {
+            animation: shuffle 0.8s ease-in-out;
+        }
+        @keyframes shuffle {
+            0% { transform: translateX(0) translateY(0) rotate(0deg); }
+            25% { transform: translateX(10px) translateY(-10px) rotate(5deg); }
+            50% { transform: translateX(-5px) translateY(5px) rotate(-3deg); }
+            75% { transform: translateX(5px) translateY(-5px) rotate(2deg); }
+            100% { transform: translateX(0) translateY(0) rotate(0deg); }
+        }
+        .main-content {
+            flex: 1;
+        }
+        footer {
+            margin-top: auto;
+        }
+        .verb-card {
+            transition: all 0.3s ease;
+        }
+        .verb-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+        }
+        .example-sentence {
+            height: 0;
+            overflow: hidden;
+            transition: height 0.3s ease;
+        }
+        .example-sentence.show {
+            height: auto;
+            padding: 0.75rem;
+        }
+        .level-transition {
+            animation: level-change 1s ease-in-out;
+        }
+        @keyframes level-change {
+            0% { opacity: 0; transform: translateY(20px); }
+            100% { opacity: 1; transform: translateY(0); }
+        }
+        .confetti {
+            position: absolute;
+            width: 10px;
+            height: 10px;
+            background-color: #f00;
+            border-radius: 50%;
+            animation: confetti-fall 3s ease-in-out forwards;
+            z-index: 100;
+        }
+        @keyframes confetti-fall {
+            0% { transform: translateY(-100px) rotate(0deg); opacity: 1; }
+            100% { transform: translateY(500px) rotate(360deg); opacity: 0; }
+        }
+    </style>
+</head>
+<body>
+    <div class="main-content container mx-auto px-4 py-8 max-w-6xl">
+        <h1 class="text-3xl font-bold text-center text-indigo-700 mb-2">Transitive vs Intransitive Verbs</h1>
+        <p class="text-center text-gray-600 mb-2">Drag each verb to the correct category</p>
+        
+        <!-- Level indicator -->
+        <div class="flex justify-center items-center gap-2 mb-4">
+            <div class="text-lg font-bold text-indigo-700">Level: <span id="level-display">1</span>/3</div>
+            <div class="w-48 bg-gray-200 rounded-full h-2.5">
+                <div class="bg-indigo-600 h-2.5 rounded-full" id="level-progress" style="width: 33%"></div>
+            </div>
+        </div>
+        
+        <div class="flex justify-center gap-4 mb-4">
+            <div class="bg-indigo-100 p-3 rounded-lg">
+                <span class="font-bold text-indigo-700">及物動詞 [T]:</span> Needs an object
+            </div>
+            <div class="bg-indigo-100 p-3 rounded-lg">
+                <span class="font-bold text-indigo-700">不及物動詞 [I]:</span> Does not need an object
+            </div>
+        </div>
+        
+        <div class="flex flex-col md:flex-row gap-6 mb-8">
+            <!-- Transitive Zone -->
+            <div class="droppable bg-blue-100 p-4 rounded-lg shadow-md flex-1 min-h-[300px]" id="transitive-zone" data-type="transitive">
+                <h2 class="text-xl font-bold text-blue-700 mb-4 text-center">及物動詞 [T]</h2>
+                <div class="flex flex-wrap gap-3 justify-center" id="transitive-container"></div>
+            </div>
+            
+            <!-- Intransitive Zone -->
+            <div class="droppable bg-green-100 p-4 rounded-lg shadow-md flex-1 min-h-[300px]" id="intransitive-zone" data-type="intransitive">
+                <h2 class="text-xl font-bold text-green-700 mb-4 text-center">不及物動詞 [I]</h2>
+                <div class="flex flex-wrap gap-3 justify-center" id="intransitive-container"></div>
+            </div>
+        </div>
+        
+        <!-- Verb Cards Container -->
+        <div class="flex flex-wrap justify-center gap-3 mb-8" id="verbs-container"></div>
+        
+        <!-- Controls -->
+        <div class="flex justify-center gap-4 mb-8">
+            <button id="check-btn" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-6 rounded-lg shadow-md transition">
+                Check Answers
+            </button>
+            <button id="reset-btn" class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-6 rounded-lg shadow-md transition">
+                Reset Level
+            </button>
+            <button id="hint-btn" class="bg-amber-500 hover:bg-amber-600 text-white font-bold py-2 px-6 rounded-lg shadow-md transition">
+                Show Hints
+            </button>
+        </div>
+        
+        <!-- Level Complete Modal -->
+        <div id="level-complete-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
+            <div class="bg-white p-8 rounded-lg shadow-lg max-w-md w-full text-center">
+                <h2 class="text-2xl font-bold text-indigo-700 mb-4">Level Complete!</h2>
+                <p class="text-lg mb-4">Your score: <span id="modal-score">0/0</span></p>
+                <p class="mb-6">Great job! Ready for the next level?</p>
+                <div class="flex justify-center gap-4">
+                    <button id="next-level-btn" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-6 rounded-lg shadow-md transition">
+                        Next Level
+                    </button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Game Complete Modal -->
+        <div id="game-complete-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
+            <div class="bg-white p-8 rounded-lg shadow-lg max-w-md w-full text-center">
+                <h2 class="text-2xl font-bold text-indigo-700 mb-4">Congratulations!</h2>
+                <p class="text-lg mb-2">You've completed all levels!</p>
+                <p class="mb-6">You've mastered transitive and intransitive verbs.</p>
+                <div class="flex justify-center gap-4">
+                    <button id="restart-game-btn" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-6 rounded-lg shadow-md transition">
+                        Play Again
+                    </button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Score Display -->
+        <div class="bg-white p-4 rounded-lg shadow-md mb-8 hidden" id="score-display">
+            <h3 class="text-lg font-bold text-center text-indigo-700 mb-2">Your Score</h3>
+            <p class="text-center text-2xl font-bold" id="score-text">0/0</p>
+            <div class="w-full bg-gray-200 rounded-full h-4 mt-2">
+                <div class="bg-indigo-600 h-4 rounded-full" id="score-bar" style="width: 0%"></div>
+            </div>
+        </div>
+        
+        <!-- Explanation Section -->
+        <div class="bg-white p-6 rounded-lg shadow-md mb-8">
+            <h3 class="text-xl font-bold text-indigo-700 mb-4">Understanding Transitive and Intransitive Verbs</h3>
+            <p class="text-gray-600 mb-4">了解及物動詞和不及物動詞</p>
+            
+            <div class="mb-6">
+                <h4 class="font-bold text-lg text-blue-700">及物動詞 [T] (Transitive Verbs)</h4>
+                <p class="mb-2">Transitive verbs <span class="font-bold">require an object</span> to complete their meaning. The action is transferred to someone or something.</p>
+                <p class="mb-2">及物動詞<span class="font-bold">需要一個受詞</span>來完成其意義。動作會傳遞給某人或某物。</p>
+                <div class="bg-blue-50 p-3 rounded-lg">
+                    <p class="font-bold">Example: She <span class="text-blue-700">bought</span> a book.</p>
+                    <p class="font-bold">例句：她<span class="text-blue-700">買了</span>一本書。</p>
+                    <p class="text-gray-600 italic">"A book" is the object receiving the action.</p>
+                    <p class="text-gray-600 italic">「一本書」是接受動作的受詞。</p>
+                </div>
+            </div>
+            
+            <div>
+                <h4 class="font-bold text-lg text-green-700">不及物動詞 [I] (Intransitive Verbs)</h4>
+                <p class="mb-2">Intransitive verbs <span class="font-bold">do not require an object</span> to complete their meaning. The action stays with the subject.</p>
+                <p class="mb-2">不及物動詞<span class="font-bold">不需要受詞</span>來完成其意義。動作停留在主詞身上。</p>
+                <div class="bg-green-50 p-3 rounded-lg">
+                    <p class="font-bold">Example: She <span class="text-green-700">slept</span>.</p>
+                    <p class="font-bold">例句：她<span class="text-green-700">睡覺</span>了。</p>
+                    <p class="text-gray-600 italic">No object is needed; the sentence is complete.</p>
+                    <p class="text-gray-600 italic">不需要受詞；句子已經完整。</p>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <footer class="bg-indigo-800 text-indigo-100 py-6 mt-8">
+        <div class="container mx-auto px-4">
+            <div class="flex flex-col md:flex-row justify-center items-center space-y-4 md:space-y-0">
+                <!-- Links -->
+                <div class="flex items-center space-x-4">
+                    <a href="https://www.aaronshi.cc" target="_blank" rel="noopener noreferrer" class="flex items-center hover:text-white transition duration-300">
+                        Go to AaronShi.cc
+                    </a>
+                    <span class="text-indigo-300">|</span>
+                    <a href="https://app.aaronshi.cc" target="_blank" rel="noopener noreferrer" class="flex items-center hover:text-white transition duration-300">
+                        Back to AaronShi.cc App
+                    </a>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Game data for all levels
+            const allLevels = [
+                // Level 1 - Basic verbs
+                [
+                    { 
+                        word: "buy", 
+                        type: "transitive", 
+                        example: "She bought a new car.",
+                        hint: "You need to specify what was bought."
+                    },
+                    { 
+                        word: "eat", 
+                        type: "transitive", 
+                        example: "They eat breakfast every morning.",
+                        hint: "You need to specify what was eaten."
+                    },
+                    { 
+                        word: "write", 
+                        type: "transitive", 
+                        example: "He wrote a letter to his friend.",
+                        hint: "You need to specify what was written."
+                    },
+                    { 
+                        word: "build", 
+                        type: "transitive", 
+                        example: "They built a house last year.",
+                        hint: "You need to specify what was built."
+                    },
+                    { 
+                        word: "teach", 
+                        type: "transitive", 
+                        example: "She teaches English to children.",
+                        hint: "You need to specify what is being taught."
+                    },
+                    { 
+                        word: "sleep", 
+                        type: "intransitive", 
+                        example: "The baby slept for three hours.",
+                        hint: "This action doesn't transfer to an object."
+                    },
+                    { 
+                        word: "arrive", 
+                        type: "intransitive", 
+                        example: "The train arrived late.",
+                        hint: "This action doesn't transfer to an object."
+                    },
+                    { 
+                        word: "laugh", 
+                        type: "intransitive", 
+                        example: "The audience laughed at the joke.",
+                        hint: "This action doesn't transfer to an object."
+                    },
+                    { 
+                        word: "run", 
+                        type: "intransitive", 
+                        example: "She runs every morning.",
+                        hint: "This action doesn't transfer to an object."
+                    },
+                    { 
+                        word: "die", 
+                        type: "intransitive", 
+                        example: "The plant died from lack of water.",
+                        hint: "This action doesn't transfer to an object."
+                    }
+                ],
+                // Level 2 - Intermediate verbs
+                [
+                    { 
+                        word: "explain", 
+                        type: "transitive", 
+                        example: "The teacher explained the concept to the students.",
+                        hint: "You need to specify what was explained."
+                    },
+                    { 
+                        word: "carry", 
+                        type: "transitive", 
+                        example: "He carried the heavy box upstairs.",
+                        hint: "You need to specify what was carried."
+                    },
+                    { 
+                        word: "discuss", 
+                        type: "transitive", 
+                        example: "We discussed the problem during the meeting.",
+                        hint: "You need to specify what was discussed."
+                    },
+                    { 
+                        word: "create", 
+                        type: "transitive", 
+                        example: "The artist created a beautiful painting.",
+                        hint: "You need to specify what was created."
+                    },
+                    { 
+                        word: "solve", 
+                        type: "transitive", 
+                        example: "They solved the difficult puzzle.",
+                        hint: "You need to specify what was solved."
+                    },
+                    { 
+                        word: "disappear", 
+                        type: "intransitive", 
+                        example: "The rabbit disappeared into the hat.",
+                        hint: "This action doesn't transfer to an object."
+                    },
+                    { 
+                        word: "swim", 
+                        type: "intransitive", 
+                        example: "The children swam in the pool.",
+                        hint: "This action doesn't transfer to an object."
+                    },
+                    { 
+                        word: "succeed", 
+                        type: "intransitive", 
+                        example: "She succeeded in her business.",
+                        hint: "This action doesn't transfer to an object."
+                    },
+                    { 
+                        word: "wait", 
+                        type: "intransitive", 
+                        example: "We waited for the bus.",
+                        hint: "This action doesn't transfer to an object."
+                    },
+                    { 
+                        word: "grow", 
+                        type: "intransitive", 
+                        example: "The plant grew quickly.",
+                        hint: "This action doesn't transfer to an object."
+                    }
+                ],
+                // Level 3 - Advanced verbs
+                [
+                    { 
+                        word: "analyze", 
+                        type: "transitive", 
+                        example: "The scientist analyzed the data carefully.",
+                        hint: "You need to specify what was analyzed."
+                    },
+                    { 
+                        word: "consider", 
+                        type: "transitive", 
+                        example: "We should consider all options before deciding.",
+                        hint: "You need to specify what was considered."
+                    },
+                    { 
+                        word: "maintain", 
+                        type: "transitive", 
+                        example: "The company maintains high standards.",
+                        hint: "You need to specify what was maintained."
+                    },
+                    { 
+                        word: "negotiate", 
+                        type: "transitive", 
+                        example: "They negotiated a new contract.",
+                        hint: "You need to specify what was negotiated."
+                    },
+                    { 
+                        word: "implement", 
+                        type: "transitive", 
+                        example: "The government implemented new policies.",
+                        hint: "You need to specify what was implemented."
+                    },
+                    { 
+                        word: "hesitate", 
+                        type: "intransitive", 
+                        example: "She hesitated before answering the question.",
+                        hint: "This action doesn't transfer to an object."
+                    },
+                    { 
+                        word: "persist", 
+                        type: "intransitive", 
+                        example: "He persisted despite the difficulties.",
+                        hint: "This action doesn't transfer to an object."
+                    },
+                    { 
+                        word: "deteriorate", 
+                        type: "intransitive", 
+                        example: "The situation deteriorated rapidly.",
+                        hint: "This action doesn't transfer to an object."
+                    },
+                    { 
+                        word: "flourish", 
+                        type: "intransitive", 
+                        example: "The business flourished under new management.",
+                        hint: "This action doesn't transfer to an object."
+                    },
+                    { 
+                        word: "prevail", 
+                        type: "intransitive", 
+                        example: "Justice will prevail in the end.",
+                        hint: "This action doesn't transfer to an object."
+                    }
+                ]
+            ];
+            
+            // Game state
+            let currentLevel = 1;
+            let hintsVisible = false;
+            
+            // Initialize game
+            loadLevel(currentLevel);
+            
+            function loadLevel(level) {
+                // Update level display
+                document.getElementById('level-display').textContent = level;
+                document.getElementById('level-progress').style.width = `${(level / 3) * 100}%`;
+                
+                // Clear containers
+                document.getElementById('transitive-container').innerHTML = '';
+                document.getElementById('intransitive-container').innerHTML = '';
+                document.getElementById('verbs-container').innerHTML = '';
+                
+                // Hide score display
+                document.getElementById('score-display').classList.add('hidden');
+                
+                // Enable check button
+                document.getElementById('check-btn').disabled = false;
+                document.getElementById('check-btn').classList.remove('opacity-50');
+                
+                // Get verbs for current level
+                const verbs = allLevels[level - 1];
+                
+                // Shuffle verbs
+                const shuffledVerbs = [...verbs].sort(() => Math.random() - 0.5);
+                
+                // Create verb cards
+                const verbsContainer = document.getElementById('verbs-container');
+                verbsContainer.classList.add('level-transition');
+                
+                shuffledVerbs.forEach(verb => {
+                    const verbCard = document.createElement('div');
+                    verbCard.className = 'verb-card draggable bg-white p-4 rounded-lg shadow-md text-center font-bold text-gray-800 w-32 flex flex-col items-center justify-center';
+                    verbCard.setAttribute('draggable', 'true');
+                    verbCard.setAttribute('data-type', verb.type);
+                    verbCard.setAttribute('data-word', verb.word);
+                    
+                    const wordSpan = document.createElement('span');
+                    wordSpan.textContent = verb.word;
+                    wordSpan.className = 'text-lg';
+                    
+                    const exampleDiv = document.createElement('div');
+                    exampleDiv.className = 'example-sentence text-xs text-left text-gray-600 mt-2 bg-gray-50 rounded w-full';
+                    exampleDiv.textContent = verb.example;
+                    
+                    if (hintsVisible) {
+                        exampleDiv.classList.add('show');
+                    }
+                    
+                    verbCard.appendChild(wordSpan);
+                    verbCard.appendChild(exampleDiv);
+                    
+                    verbsContainer.appendChild(verbCard);
+                });
+                
+                setTimeout(() => {
+                    verbsContainer.classList.remove('level-transition');
+                }, 1000);
+            }
+            
+            // Drag and drop functionality
+            let draggedItem = null;
+            
+            document.addEventListener('dragstart', function(e) {
+                if (e.target.classList.contains('draggable')) {
+                    draggedItem = e.target;
+                    setTimeout(() => {
+                        e.target.style.opacity = '0.5';
+                    }, 0);
+                }
+            });
+            
+            document.addEventListener('dragend', function(e) {
+                if (e.target.classList.contains('draggable')) {
+                    e.target.style.opacity = '1';
+                }
+            });
+            
+            document.addEventListener('dragover', function(e) {
+                e.preventDefault();
+                if (e.target.classList.contains('droppable') || e.target.closest('.droppable')) {
+                    const dropZone = e.target.classList.contains('droppable') ? e.target : e.target.closest('.droppable');
+                    dropZone.classList.add('highlight');
+                }
+            });
+            
+            document.addEventListener('dragleave', function(e) {
+                if (e.target.classList.contains('droppable') || e.target.closest('.droppable')) {
+                    const dropZone = e.target.classList.contains('droppable') ? e.target : e.target.closest('.droppable');
+                    dropZone.classList.remove('highlight');
+                }
+            });
+            
+            document.addEventListener('drop', function(e) {
+                e.preventDefault();
+                if (e.target.classList.contains('droppable') || e.target.closest('.droppable')) {
+                    const dropZone = e.target.classList.contains('droppable') ? e.target : e.target.closest('.droppable');
+                    dropZone.classList.remove('highlight');
+                    
+                    if (draggedItem) {
+                        const container = dropZone.querySelector('div');
+                        container.appendChild(draggedItem);
+                        draggedItem.classList.add('success-animation');
+                        setTimeout(() => {
+                            draggedItem.classList.remove('success-animation');
+                        }, 500);
+                    }
+                }
+            });
+            
+            // Button functionality
+            document.getElementById('check-btn').addEventListener('click', checkAnswers);
+            document.getElementById('reset-btn').addEventListener('click', resetLevel);
+            document.getElementById('hint-btn').addEventListener('click', toggleHints);
+            document.getElementById('next-level-btn').addEventListener('click', nextLevel);
+            document.getElementById('restart-game-btn').addEventListener('click', restartGame);
+            
+            function checkAnswers() {
+                const transitiveContainer = document.getElementById('transitive-container');
+                const intransitiveContainer = document.getElementById('intransitive-container');
+                
+                const transitiveVerbs = transitiveContainer.querySelectorAll('.verb-card');
+                const intransitiveVerbs = intransitiveContainer.querySelectorAll('.verb-card');
+                
+                let correct = 0;
+                let total = transitiveVerbs.length + intransitiveVerbs.length;
+                
+                // Check transitive verbs
+                transitiveVerbs.forEach(verb => {
+                    if (verb.getAttribute('data-type') === 'transitive') {
+                        verb.classList.add('bg-green-100');
+                        verb.classList.add('success-animation');
+                        correct++;
+                    } else {
+                        verb.classList.add('bg-red-100');
+                        verb.classList.add('warning');
+                    }
+                });
+                
+                // Check intransitive verbs
+                intransitiveVerbs.forEach(verb => {
+                    if (verb.getAttribute('data-type') === 'intransitive') {
+                        verb.classList.add('bg-green-100');
+                        verb.classList.add('success-animation');
+                        correct++;
+                    } else {
+                        verb.classList.add('bg-red-100');
+                        verb.classList.add('warning');
+                    }
+                });
+                
+                // Show score
+                const scoreDisplay = document.getElementById('score-display');
+                const scoreText = document.getElementById('score-text');
+                const scoreBar = document.getElementById('score-bar');
+                
+                scoreDisplay.classList.remove('hidden');
+                scoreText.textContent = `${correct}/${total}`;
+                scoreBar.style.width = `${(correct / total) * 100}%`;
+                
+                // Disable check button
+                document.getElementById('check-btn').disabled = true;
+                document.getElementById('check-btn').classList.add('opacity-50');
+                
+                // If all correct and all verbs placed, show level complete modal
+                if (correct === total && total === allLevels[currentLevel - 1].length) {
+                    setTimeout(() => {
+                        document.getElementById('modal-score').textContent = `${correct}/${total}`;
+                        
+                        if (currentLevel < 3) {
+                            document.getElementById('level-complete-modal').classList.remove('hidden');
+                            createConfetti();
+                        } else {
+                            document.getElementById('game-complete-modal').classList.remove('hidden');
+                            createConfetti();
+                        }
+                    }, 1000);
+                }
+            }
+            
+            function resetLevel() {
+                // Get all verb cards from all containers
+                const transitiveContainer = document.getElementById('transitive-container');
+                const intransitiveContainer = document.getElementById('intransitive-container');
+                const verbsContainer = document.getElementById('verbs-container');
+                
+                // Get all verb cards from all containers
+                const allVerbCards = document.querySelectorAll('.verb-card');
+                
+                // Clear all containers
+                transitiveContainer.innerHTML = '';
+                intransitiveContainer.innerHTML = '';
+                verbsContainer.innerHTML = '';
+                
+                // Reset and move all cards back to the verbs container
+                allVerbCards.forEach(card => {
+                    card.classList.remove('bg-green-100', 'bg-red-100', 'warning', 'success-animation');
+                    verbsContainer.appendChild(card);
+                });
+                
+                // Shuffle verb cards
+                const verbCards = Array.from(verbsContainer.children);
+                verbCards.sort(() => Math.random() - 0.5).forEach(card => {
+                    card.classList.add('shuffle-animation');
+                    verbsContainer.appendChild(card);
+                    setTimeout(() => {
+                        card.classList.remove('shuffle-animation');
+                    }, 800);
+                });
+                
+                // Hide score
+                document.getElementById('score-display').classList.add('hidden');
+                
+                // Enable check button
+                document.getElementById('check-btn').disabled = false;
+                document.getElementById('check-btn').classList.remove('opacity-50');
+            }
+            
+            function toggleHints() {
+                const examples = document.querySelectorAll('.example-sentence');
+                const hintBtn = document.getElementById('hint-btn');
+                
+                hintsVisible = !hintsVisible;
+                
+                if (hintsVisible) {
+                    examples.forEach(example => example.classList.add('show'));
+                    hintBtn.textContent = 'Hide Hints';
+                } else {
+                    examples.forEach(example => example.classList.remove('show'));
+                    hintBtn.textContent = 'Show Hints';
+                }
+            }
+            
+            function nextLevel() {
+                if (currentLevel < 3) {
+                    currentLevel++;
+                    document.getElementById('level-complete-modal').classList.add('hidden');
+                    loadLevel(currentLevel);
+                }
+            }
+            
+            function restartGame() {
+                currentLevel = 1;
+                document.getElementById('game-complete-modal').classList.add('hidden');
+                loadLevel(currentLevel);
+            }
+            
+            function createConfetti() {
+                const colors = ['#ff0000', '#00ff00', '#0000ff', '#ffff00', '#ff00ff', '#00ffff'];
+                
+                for (let i = 0; i < 100; i++) {
+                    const confetti = document.createElement('div');
+                    confetti.className = 'confetti';
+                    confetti.style.left = `${Math.random() * 100}%`;
+                    confetti.style.backgroundColor = colors[Math.floor(Math.random() * colors.length)];
+                    confetti.style.animationDuration = `${Math.random() * 3 + 2}s`;
+                    document.body.appendChild(confetti);
+                    
+                    // Remove confetti after animation
+                    setTimeout(() => {
+                        confetti.remove();
+                    }, 5000);
+                }
+            }
+        });
+    </script>
+<script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'959f068323774a45',t:'MTc1MTYzNjMzMi4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+</html>
